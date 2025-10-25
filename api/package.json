@@ -1,4 +1,11 @@
 {
-  "version": 2,
-  "builds": [{ "src": "api/**/*.js", "use": "@vercel/node" }]
+  "name": "instagram-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0"
+  }
 }

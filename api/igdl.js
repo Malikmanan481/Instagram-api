@@ -1,68 +1,36 @@
-// /api/instagram.js
-import { PlaywrightCrawler } from 'crawlee';
-import { chromium } from 'playwright-core';
+import puppeteer from "puppeteer";
 
 export default async function handler(req, res) {
   const { url } = req.query;
-  if (!url) return res.status(400).json({ error: 'Missing ?url parameter' });
+  if (!url) return res.status(400).json({ error: "Missing Instagram URL" });
 
   try {
-    let result = [];
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // Initialize Crawlee with Playwright
-    const crawler = new PlaywrightCrawler({
-      launchContext: {
-        launcher: chromium,
-        launchOptions: {
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        },
-      },
-      async requestHandler({ page }) {
-        await page.goto(url, { waitUntil: 'networkidle' });
-
-        // Extract JSON data from <script type="application/ld+json"> or window._sharedData
-        const scriptData = await page.evaluate(() => {
-          const ld = document.querySelector('script[type="application/ld+json"]');
-          if (ld) {
-            try {
-              return JSON.parse(ld.innerText);
-            } catch (_) {}
-          }
-
-          // Fallback: older Instagram pages expose window._sharedData
-          const shared = [...document.scripts]
-            .map(s => s.textContent)
-            .find(t => t.includes('window._sharedData'));
-          if (shared) {
-            const match = shared.match(/window\._sharedData\s*=\s*(\{.+\});/);
-            if (match) return JSON.parse(match[1]);
-          }
-          return null;
-        });
-
-        if (scriptData) {
-          // Normalize media links
-          if (scriptData.video && scriptData.video.contentUrl) {
-            result.push({ type: 'video', url: scriptData.video.contentUrl });
-          } else if (scriptData.image) {
-            const images = Array.isArray(scriptData.image)
-              ? scriptData.image
-              : [scriptData.image];
-            result.push(...images.map(img => ({ type: 'image', url: img })));
-          }
-        }
-      },
+    const data = await page.evaluate(() => {
+      const videos = [...document.querySelectorAll("video")].map(v => v.src);
+      const images = [...document.querySelectorAll("article img")].map(i => i.src);
+      const caption = document.querySelector("meta[property='og:title']")?.content || "";
+      return { videos, images, caption };
     });
 
-    await crawler.run([url]);
+    await browser.close();
 
-    if (result.length === 0)
-      return res.status(404).json({ error: 'No media found. Might be private or restricted.' });
+    if (!data.videos.length && !data.images.length)
+      return res.json({ error: "No media found. Possibly private or invalid link." });
 
-    res.status(200).json({ success: true, data: result });
+    const result = [];
+    for (let v of data.videos) result.push({ type: "video", url: v, caption: data.caption });
+    for (let i of data.images) result.push({ type: "image", url: i, caption: data.caption });
+
+    res.status(200).json({ status: "success", media: result });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error while fetching Instagram media.' });
+    res.status(500).json({ error: "Failed to fetch Instagram media." });
   }
 }

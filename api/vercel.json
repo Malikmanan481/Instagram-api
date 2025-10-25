@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/igdl.js": {
-      "maxDuration": 60
-    }
-  }
-}

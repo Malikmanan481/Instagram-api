@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/igdl.js": {
+    "igdl.js": {
       "maxDuration": 60
     }
   }

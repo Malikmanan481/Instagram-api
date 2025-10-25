@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (!url) return res.status(400).json({ error: "No URL provided." });
 
   try {
-    const api = `https://api.tioxy.tech/api/igdl?url=${encodeURIComponent(url)}`;
+    const api = `https://malik-x-instagram-api.vercel.app/api/igdl?url=${encodeURIComponent(url)}`;
     const response = await fetch(api);
     const data = await response.json();
 
